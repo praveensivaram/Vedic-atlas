@@ -49,6 +49,10 @@ The assistant keeps four kinds of memory:
 Summaries and exchange notes reach the prompt only when recall decides they are relevant. That decision is the heart of
 the design.
 
+![How the memory layer saves and recalls](memory-flow.png)
+*Saving needs no model call per turn; recalling adds nothing unless a memory clears the floor. (Diagram created with AI
+assistance.)*
+
 ## The default amount of memory is zero
 
 A vector search always returns *something*: there is always a nearest neighbor. If you add the top few results to every

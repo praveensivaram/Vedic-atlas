@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="1290" viewBox="0 0 1620 1290" font-family="DejaVu Sans, Helvetica, Arial, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker></defs>
+<rect width="1620" height="1290" fill="#ffffff"/>
+<text x="810.0" y="70" font-size="42" font-weight="bold" text-anchor="middle" fill="#1f2937">How the memory layer saves and recalls</text>
+<text x="360.0" y="150" font-size="30" font-weight="bold" text-anchor="middle" fill="#2f6b3a">SAVING: no model call per turn</text>
+<rect x="80" y="200" width="560" height="112" rx="14" fill="#e9f6ec" stroke="#3f8f50" stroke-width="3"/>
+<text x="360.0" y="251.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">A turn ends</text>
+<text x="360.0" y="287.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">question + reply saved</text>
+<rect x="80" y="352" width="560" height="112" rx="14" fill="#e9f6ec" stroke="#3f8f50" stroke-width="3"/>
+<text x="360.0" y="403.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Exchange note</text>
+<text x="360.0" y="439.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">“You: … | Assistant: …”, words as said</text>
+<line x1="360.0" y1="312" x2="360.0" y2="348" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+<rect x="80" y="504" width="560" height="112" rx="14" fill="#e9f6ec" stroke="#3f8f50" stroke-width="3"/>
+<text x="360.0" y="555.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Embed in the background</text>
+<text x="360.0" y="591.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">BGE-small, two threads</text>
+<line x1="360.0" y1="464" x2="360.0" y2="500" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+<rect x="80" y="656" width="560" height="112" rx="14" fill="#e9f6ec" stroke="#3f8f50" stroke-width="3"/>
+<text x="360.0" y="707.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Store in SQLite</text>
+<text x="360.0" y="743.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">float32 vectors, no vector DB</text>
+<line x1="360.0" y1="616" x2="360.0" y2="652" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+<rect x="80" y="848" width="560" height="170" rx="14" fill="#ffffff" stroke="#3f8f50" stroke-width="3" stroke-dasharray="10 8"/>
+<text x="360.0" y="898.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">When a conversation ends</text>
+<text x="360.0" y="934.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">(30 min of silence) the model writes</text>
+<text x="360.0" y="964.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">one summary: the only model call.</text>
+<text x="360.0" y="994.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">Embedded and stored the same way.</text>
+<line x1="360.0" y1="848" x2="360.0" y2="772" stroke="#374151" stroke-width="3" marker-end="url(#a)" stroke-dasharray="10 8"/>
+<text x="1170.0" y="150" font-size="30" font-weight="bold" text-anchor="middle" fill="#3b4fa8">RECALLING: the default is nothing</text>
+<rect x="760" y="200" width="440" height="112" rx="14" fill="#e8f0fe" stroke="#3b6fd8" stroke-width="3"/>
+<text x="980.0" y="266.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">A question arrives</text>
+<rect x="760" y="352" width="440" height="112" rx="14" fill="#e8f0fe" stroke="#3b6fd8" stroke-width="3"/>
+<text x="980.0" y="418.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Embed the question</text>
+<line x1="980.0" y1="312" x2="980.0" y2="348" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+<rect x="760" y="504" width="440" height="112" rx="14" fill="#e8f0fe" stroke="#3b6fd8" stroke-width="3"/>
+<text x="980.0" y="555.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Search each source</text>
+<text x="980.0" y="591.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">summaries and notes, separately</text>
+<line x1="980.0" y1="464" x2="980.0" y2="500" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+<rect x="760" y="656" width="440" height="112" rx="14" fill="#e8f0fe" stroke="#3b6fd8" stroke-width="3"/>
+<text x="980.0" y="707.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Similarity floor</text>
+<text x="980.0" y="743.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">0.62 summaries · 0.70 notes</text>
+<line x1="980.0" y1="616" x2="980.0" y2="652" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+<rect x="760" y="808" width="440" height="112" rx="14" fill="#e8f0fe" stroke="#3b6fd8" stroke-width="3"/>
+<text x="980.0" y="859.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Keep near-ties</text>
+<text x="980.0" y="895.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">within 0.05 of the best, up to 4</text>
+<line x1="980.0" y1="768" x2="980.0" y2="804" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+<rect x="760" y="960" width="440" height="112" rx="14" fill="#e8f0fe" stroke="#3b6fd8" stroke-width="3"/>
+<text x="980.0" y="1011.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Cap the size</text>
+<text x="980.0" y="1047.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">~800 characters ≈ 200 tokens</text>
+<line x1="980.0" y1="920" x2="980.0" y2="956" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+<rect x="760" y="1112" width="440" height="112" rx="14" fill="#e8f0fe" stroke="#3b6fd8" stroke-width="3"/>
+<text x="980.0" y="1163.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Into the prompt</text>
+<text x="980.0" y="1199.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">dated, newest first</text>
+<line x1="980.0" y1="1072" x2="980.0" y2="1108" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+<rect x="1250" y="636" width="330" height="152" rx="14" fill="#fff4e5" stroke="#c77a12" stroke-width="3"/>
+<text x="1415.0" y="692.0" font-size="30" font-weight="bold" text-anchor="middle" fill="#1f2937">Nothing passes</text>
+<text x="1415.0" y="728.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">no memory is added</text>
+<text x="1415.0" y="758.0" font-size="24" font-weight="normal" text-anchor="middle" fill="#4b5563">(most ordinary turns)</text>
+<line x1="1200" y1="712.0" x2="1246" y2="712.0" stroke="#374151" stroke-width="3" marker-end="url(#a)"/>
+</svg>
