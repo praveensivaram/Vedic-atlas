@@ -51,6 +51,10 @@ adds that delay to every turn.</p>
 </ul>
 <p>Summaries and exchange notes reach the prompt only when recall decides they are relevant. That decision is the heart of
 the design.</p>
+<p class="tip">IMAGE: delete this box in Medium and upload memory-flow.png here (Medium does not copy local images).</p>
+<p><img alt="How the memory layer saves and recalls" src="memory-flow.png" style="max-width:100%">
+<em>Saving needs no model call per turn; recalling adds nothing unless a memory clears the floor. (Diagram created with AI
+assistance.)</em></p>
 <h2>The default amount of memory is zero</h2>
 <p>A vector search always returns <em>something</em>: there is always a nearest neighbor. If you add the top few results to every
 prompt, an assistant that is mostly asked "set a timer" gets unrelated old conversations on almost every turn. That costs
