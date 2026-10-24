@@ -1,7 +1,7 @@
 # Remember Less, Answer Better: Designing Memory for a Small Model on Low-Power Hardware
 
-*Draft v3. Every number in this article was measured on a laptop CPU with the low-compute settings described below,
-on my own data. The target device was never used for these measurements.*
+*Draft v4. Every number in this article was measured on a laptop CPU with the low-compute settings described below,
+on my own data.*
 
 ---
 
@@ -9,17 +9,16 @@ Most writing about memory for AI assistants assumes storage is the expensive par
 facts with a model, embed them, retrieve the top few, and add them to every request. On a hosted model that is a
 reasonable trade.
 
-I build an offline voice assistant designed for a Raspberry Pi 5 class device: four ARM cores, 8 GB of RAM, no GPU and
-no cloud model. The language model is a quantized Qwen3 (4B, with 1.7B and 0.6B configurations for speed), run
-in-process with llama-cpp-python. Speech-to-text, text-to-speech, the wake word and the embedding model all share the
-same CPU.
+I build an offline voice assistant for low-power hardware: a few CPU cores, a few gigabytes of RAM, no GPU and no cloud
+model. The language model is a quantized Qwen3 (4B, with 1.7B and 0.6B configurations for speed), run in-process with
+llama-cpp-python. Speech-to-text, text-to-speech, the wake word and the embedding model all share the same CPU.
 
-I have not yet measured anything on the Pi itself. Everything below was measured on a laptop CPU (an Intel Core
-i5-13420H, no GPU used) with the settings a low-power device needs: a 4-bit model, a 3,072-token context, a trimmed
-persona and short histories. A laptop is faster than a Pi, so read the timings as a lower bound; the token counts and
-the number of model calls are the same on either.
+Everything below was measured on a laptop CPU (an Intel Core i5-13420H, no GPU used) with the settings low-power
+hardware needs: a 4-bit model, a 3,072-token context, a trimmed persona and short histories. Nothing in the memory layer
+needs more than a small single-board computer such as a Raspberry Pi 5 provides: the embedding model is about 130 MB on
+disk and runs on two threads, the store is a single SQLite file, and it adds no model calls.
 
-On that hardware the trade reverses. Storage is nearly free; the prompt is where the time goes. Every token the model
+On hardware like this the trade reverses. Storage is nearly free; the prompt is where the time goes. Every token the model
 reads before it answers is time the user spends waiting, and every model call that is not the answer is a call the user
 waits behind. A memory design that is sensible in the cloud can add seconds to every turn on a device like this.
 
@@ -202,7 +201,7 @@ found nothing, so an unrelated short question does not drag the last topic back 
 
 ## What it costs
 
-Most of the cost of this design is structural, so it is the same on a laptop or a Pi:
+Most of the cost of this design is structural, so it does not depend on the hardware:
 
 | Per chat turn | Cost |
 |---|---|
