@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#0f1b2d}
+.c{width:1200px;height:1200px;box-sizing:border-box;padding:80px 84px;font-family:"DejaVu Sans",Helvetica,Arial,sans-serif;color:#e8eef7;
+ background:radial-gradient(circle at 85% 10%,#1f3b63 0,#0f1b2d 55%);display:flex;flex-direction:column}
+.k{font-size:26px;letter-spacing:3px;color:#7fb2ff;font-weight:bold}
+h1{font-size:64px;line-height:1.15;margin:26px 0 0;font-weight:bold}
+h1 em{font-style:normal;color:#ffb648}
+.stat{margin-top:60px;display:flex;align-items:center;gap:36px}
+.n{font-size:150px;font-weight:bold;line-height:1}
+.bad{color:#ff7a6b}.good{color:#5fd38d}
+.arr{font-size:90px;color:#9fb3cc}
+.cap{font-size:30px;color:#b8c7da;margin-top:18px}
+ul{list-style:none;padding:0;margin:70px 0 0;font-size:31px;line-height:1.5}
+li{margin:0 0 26px;padding-left:44px;position:relative}
+li:before{content:"";position:absolute;left:0;top:14px;width:20px;height:20px;border-radius:50%;background:#7fb2ff}
+.f{margin-top:auto;font-size:26px;color:#8ea3bd;border-top:2px solid #2a4266;padding-top:26px}
+</style></head><body><div class="c">
+<div class="k">MEMORY FOR SMALL MODELS ON LOW-POWER HARDWARE</div>
+<h1>My assistant's memory was<br><em>making it worse.</em></h1>
+<div class="stat"><span class="n bad">15/16</span><span class="arr">&rarr;</span><span class="n good">4/16</span></div>
+<div class="cap">ordinary questions that pulled unrelated memories into the prompt</div>
+<ul>
+<li>A similarity floor measured on my own embedding model</li>
+<li>Recalled memory capped at ~200 tokens; the default is zero</li>
+<li>No model calls while you talk; one summary per conversation</li>
+</ul>
+<div class="f">Laptop CPU, low-compute settings &middot; small, self-built evaluation set</div>
+</div></body></html>
