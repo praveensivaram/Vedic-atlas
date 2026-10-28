@@ -25,6 +25,7 @@ class ToolParamSchema(BaseModel):
     required: bool = False
     enum: list[str] = Field(default_factory=list)
     description: str = ""
+    format: Literal["latin"] | None = None
 
 
 class ToolExampleSchema(BaseModel):
@@ -120,7 +121,8 @@ class ToolManifestSchema(BaseModel):
             agent=self.agent,
             description=self.description,
             params=tuple(
-                ToolParam(name=n, type=p.type, required=p.required, enum=tuple(p.enum), description=p.description)
+                ToolParam(name=n, type=p.type, required=p.required, enum=tuple(p.enum), description=p.description,
+                          format=p.format)
                 for n, p in self.params.items()
             ),
             examples=tuple(

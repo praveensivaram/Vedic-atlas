@@ -247,7 +247,7 @@ def test_narration_input_is_capped_by_the_tools_max_result_tokens():
     seen = {}
     e = env([dec([call("web_search", query="x")], live=True)], {"web_search": ok(observation="word " * 3000)})
     orig = e.orch._composer.narrate_stage
-    e.orch._composer.narrate_stage = lambda q, results: seen.setdefault("n", len(results[0])) and orig(q, results)
+    e.orch._composer.narrate_stage = lambda q, results, language=None: seen.setdefault("n", len(results[0])) and orig(q, results, language=language)
     turn(e, "x")
     assert seen["n"] < 3000 * 5 / 2                                             # cut well below the raw 15000 chars
 

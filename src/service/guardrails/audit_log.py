@@ -40,7 +40,7 @@ class AuditLogger:
             return
         try:
             with open(self._get_log_file(), "a", encoding="utf-8") as f:
-                f.write(json.dumps(event, default=str) + "\n")
+                f.write(json.dumps(event, default=str, ensure_ascii=False) + "\n")
         except Exception as e:
             logger.error(f"Failed to write audit event: {e}")
 

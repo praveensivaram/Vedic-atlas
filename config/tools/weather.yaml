@@ -11,6 +11,7 @@ hosts: [api.open-meteo.com, geocoding-api.open-meteo.com]
 params:
   place:
     type: string
+    format: latin          # transliterate the user's script before geocoding
     description: city or place name; empty means home
 
 examples:

@@ -23,8 +23,10 @@ from domain.entities.agent_result import AgentResult
 from domain.ports.inference_port import InferencePort
 from domain.ports.knowledge_store_port import KnowledgeStorePort
 from domain.ports.memory_repository_port import MemoryRepositoryPort
-from core.logging_config import logger
+from core.logging_config import logger, log_text
 from domain.policies.claim_guard_policy import SentenceClaimGuard
+from domain.policies.echo_policy import fallback_reply, is_echo
+from domain.policies.language_policy import language_of
 from domain.policies.reply_filler_policy import FillerStreamFilter, strip_filler
 from domain.policies.reply_policy import UNCONFIRMED_REPLY
 from domain.policies.token_budget_policy import estimate_tokens
@@ -130,7 +132,22 @@ class ResponderAgent(LLMAgent):
                 "Do not mention that other part and do not answer it yourself."
             )
         tail.append(f"USER: {ctx.user_message}")
-        tail.append("Respond directly to the user. Be concise and conversational.")
+        # The control decode names the language for any language; the detector is the safety override for the
+        # scripts it knows exactly. Naming it beats "reply in the user's language": a small model follows a
+        # concrete instruction, and the abstract rule is easy to ignore in a long English persona.
+        language = ctx.metadata.get("language") or language_of(ctx.user_message)
+        if language:
+            tail.append(f"The user wrote in {language}. Write your entire reply in {language}.")
+        if ctx.metadata.get("no_echo"):
+            tail.append(
+                "Your previous attempt repeated the user's message. Answer it now in your own words; "
+                "do not repeat or restate it."
+            )
+        tail.append(
+            "Respond directly to the user in the same language as USER's message "
+            "(English only if USER wrote English). Answer it; never repeat or restate the user's message. "
+            "Be concise and conversational."
+        )
         fits = None
         if self._chat_budget is not None:
             system_tokens = estimate_tokens(self.system_prompt)
@@ -178,7 +195,7 @@ class ResponderAgent(LLMAgent):
 
     def _vet(self, response: str) -> str:
         if self._reply_veto is not None and response and self._reply_veto(response):
-            logger.warning(f"[tool-guard] chat reply claimed an action with no tool call: {response[:160]!r}")
+            logger.warning(f"[tool-guard] chat reply claimed an action with no tool call: {log_text(response, 160)}")
             return UNCONFIRMED_REPLY
         return response
 
@@ -186,8 +203,8 @@ class ResponderAgent(LLMAgent):
         await self._prepare_semantic_context(ctx)
         # Stock "let me know if you need anything else" sentences are dropped as they stream, so they are
         # neither spoken nor left in the text the user sees.
-        filler_filter = FillerStreamFilter()
         if self._reply_veto is None:
+            filler_filter = FillerStreamFilter()
             async for chunk in super().execute_stream(ctx, cancel_event=cancel_event):
                 text = filler_filter.feed(chunk)
                 if text:
@@ -199,45 +216,73 @@ class ResponderAgent(LLMAgent):
 
         # Vetted path: text is released only in whole sentences, each checked first. On a violation the model is
         # stopped through a PRIVATE cancel event (the caller's event also decides whether [DONE] is sent).
-        guard = SentenceClaimGuard(self._reply_veto)
-        spoken: list[str] = []
-        inner_cancel = asyncio.Event()
+        for attempt in range(2):
+            filler_filter = FillerStreamFilter()
+            guard = SentenceClaimGuard(self._reply_veto)
+            spoken: list[str] = []
+            inner_cancel = asyncio.Event()
 
-        async def _relay() -> None:  # a caller cancel (e.g. mute) must still reach the model
-            if cancel_event is not None:
-                await cancel_event.wait()
-                inner_cancel.set()
-
-        relay = asyncio.create_task(_relay())
-        stream = super().execute_stream(ctx, cancel_event=inner_cancel)
-        base_finished = False   # the base stream ran to its end, so it already saved the turn itself
-        try:
-            async for chunk in stream:
-                text = filler_filter.feed(chunk)
-                for sentence in guard.feed(text) if text else []:
-                    spoken.append(sentence)
-                    yield sentence
-                if guard.tripped:
+            async def _relay() -> None:  # a caller cancel (e.g. mute) must still reach the model
+                if cancel_event is not None:
+                    await cancel_event.wait()
                     inner_cancel.set()
-                    break
-            else:
-                base_finished = True
-            if not guard.tripped and not (cancel_event is not None and cancel_event.is_set()):
-                for sentence in guard.feed(filler_filter.finish()) + guard.finish():
-                    spoken.append(sentence)
-                    yield sentence
-        finally:
-            relay.cancel()
-            await stream.aclose()
 
-        if guard.tripped:
-            logger.warning("[tool-guard] streamed chat reply claimed an action with no tool call; stopped")
-            if not guard.released:
-                yield UNCONFIRMED_REPLY
-            if not base_finished:
-                # The base stream was cut short, so it never saved the turn: save what the user was actually given.
-                # (If it did finish it saved the full text through on_completion, which vets it.)
-                await self.on_completion(ctx, "".join(spoken).strip() or UNCONFIRMED_REPLY)
+            relay = asyncio.create_task(_relay())
+            stream = super().execute_stream(ctx, cancel_event=inner_cancel)
+            base_finished = False   # the base stream ran to its end, so it already saved the turn itself
+            echoed = False
+            first_sentence = True
+            try:
+                async for chunk in stream:
+                    text = filler_filter.feed(chunk)
+                    for sentence in guard.feed(text) if text else []:
+                        if first_sentence:
+                            first_sentence = False
+                            if is_echo(sentence, ctx.user_message):
+                                # The model handed the user's own message back. Nothing has been released yet,
+                                # so stop it here and answer again instead of showing the echo.
+                                echoed = True
+                                inner_cancel.set()
+                                break
+                        spoken.append(sentence)
+                        yield sentence
+                    if echoed or guard.tripped:
+                        inner_cancel.set()
+                        break
+                else:
+                    base_finished = True
+                if not echoed and not guard.tripped and not (cancel_event is not None and cancel_event.is_set()):
+                    for sentence in guard.feed(filler_filter.finish()) + guard.finish():
+                        if first_sentence:
+                            first_sentence = False
+                            if is_echo(sentence, ctx.user_message):
+                                echoed = True
+                                break
+                        spoken.append(sentence)
+                        yield sentence
+            finally:
+                relay.cancel()
+                await stream.aclose()
+
+            if guard.tripped:
+                logger.warning("[tool-guard] streamed chat reply claimed an action with no tool call; stopped")
+                if not guard.released:
+                    yield UNCONFIRMED_REPLY
+                if not base_finished:
+                    # The base stream was cut short, so it never saved the turn: save what the user was actually given.
+                    # (If it did finish it saved the full text through on_completion, which vets it.)
+                    await self.on_completion(ctx, "".join(spoken).strip() or UNCONFIRMED_REPLY)
+                return
+            if not echoed:
+                return
+            logger.warning(f"[language] chat reply echoed the user: {log_text(''.join(spoken), 120)}")
+            if attempt == 0:
+                ctx.metadata["no_echo"] = True   # build_prompt asks for a real answer on the retry
+                continue
+            answer = fallback_reply(ctx.metadata.get("language"))
+            yield answer
+            await self.on_completion(ctx, answer)
+            return
 
     def _render_history(self, fits: Callable[[str], bool] | None = None) -> str:
         blocks: list[str] = []

@@ -101,6 +101,16 @@ class OpenWakeWordEngine:
             self.last_score = float(scores.get(self._model_name, 0.0))
             if self.last_score >= self._threshold:
                 triggered = True
+        if triggered:
+            # Reset the model's prediction buffer and any partial chunk. Without this the same detection
+            # keeps re-firing on the following frames (observed as repeated wake acknowledgements in silence).
+            self._buf.clear()
+            reset = getattr(self._model, "reset", None)
+            if callable(reset):
+                try:
+                    reset()
+                except Exception:
+                    pass
         return triggered
 
     def start(self) -> None:

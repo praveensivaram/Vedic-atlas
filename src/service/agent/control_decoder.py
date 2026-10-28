@@ -28,7 +28,7 @@ class DecodeResult:
     prompt_tokens: int = 0
     ms: int = 0
     trimmed: tuple[str, ...] = ()
-    raw: str = ""   # what the router model actually emitted, for the log
+    raw: str = ""                       # the model's raw output, for the control log
 
 
 def parse_decision(raw: str) -> ControlDecision:
@@ -36,6 +36,7 @@ def parse_decision(raw: str) -> ControlDecision:
     try:
         data = json.loads(raw)
         calls, live, clar = data["calls"], data["needs_live_data"], data.get("clarification")
+        language = data.get("language")
         advise, also_chat = data.get("advise", False), data.get("also_chat", False)
     except (TypeError, ValueError, KeyError):
         return ControlDecision(valid=False, note=f"unparseable: {str(raw)[:120]!r}")
@@ -43,7 +44,12 @@ def parse_decision(raw: str) -> ControlDecision:
         return ControlDecision(valid=False, note=f"wrong types: {str(raw)[:120]!r}")
     if not isinstance(advise, bool) or not isinstance(also_chat, bool):   # strict: never coerce "true" / 1
         return ControlDecision(valid=False, note=f"wrong types: {str(raw)[:120]!r}")
-    return ControlDecision(calls=tuple(calls), needs_live_data=live, clarification=clar, advise=advise, also_chat=also_chat)
+    if not (language is None or isinstance(language, str)):
+        return ControlDecision(valid=False, note=f"wrong types: {str(raw)[:120]!r}")
+    return ControlDecision(
+        calls=tuple(calls), needs_live_data=live, clarification=clar,
+        language=language, advise=advise, also_chat=also_chat,
+    )
 
 
 class ControlDecoder:
