@@ -296,6 +296,10 @@ def build_app_state(app: FastAPI) -> None:
         adaptive_reply=cfg.app.adaptive_reply, mixed_intent=cfg.app.mixed_intent,
         parallel_tool_calls=cfg.app.parallel_tool_calls,
         room_context=(lambda: room_line(room_state.get(), datetime.now(), room_cfg.max_age_sec)) if room_driver is not None else None,
+        multilingual=cfg.app.multilingual.enabled,
+        reject_unknown_language=cfg.app.multilingual.reject_unknown,
+        unknown_language_reply=cfg.app.multilingual.unknown_reply,
+        min_language_letters=cfg.app.multilingual.min_letters,
     )
     app.state.orchestrator = orchestrator
     supervisor = SupervisorAgent(model=cfg.agents.supervisor.model, orchestrator=orchestrator)

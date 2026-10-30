@@ -52,6 +52,19 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 
+class MultilingualConfig(BaseModel):
+    """app.multilingual: reply in the user's language, or say you did not understand."""
+
+    enabled: bool = True
+    # When neither the deterministic detector nor the control model can name the
+    # language, answer with `unknown_reply` instead of guessing English.
+    reject_unknown: bool = True
+    # Only reject messages that plausibly ARE language: at least two words and
+    # this many letters. Keeps "2+2" and "ok" from being called unreadable.
+    min_letters: int = 8
+    unknown_reply: str = "Sorry, I didn't understand that. Could you say it again?"
+
+
 class AppSectionConfig(BaseModel):
     """app: section — process-level basics."""
 
@@ -72,6 +85,7 @@ class AppSectionConfig(BaseModel):
     mixed_intent: bool = False
     # docs/12 P8: calls whose permission level is `auto` (lookups) run at the same time; everything else stays serial.
     parallel_tool_calls: bool = False
+    multilingual: MultilingualConfig = MultilingualConfig()
 
 
 class InferenceConfig(BaseModel):
@@ -213,13 +227,24 @@ class AudioConfig(BaseModel):
     # Local STT model directory (faster-whisper format). No auto-download.
     stt_model: str = "base.en"
     stt_model_path: str | None = None
+    # "faster_whisper" (in-process, laptop) | "whisper_cpp" (Pi; adapter lands in a later phase).
+    stt_backend: str = "faster_whisper"
+    # "auto" lets a multilingual model detect the language; a code pins it ("en", "hi", "te", "de", "ja", "kn").
+    # An English-only (.en) model must stay pinned to "en".
+    stt_language: str = "auto"
+    # Short utterances misdetect. Below this duration the sticky hint (last successful language) is trusted.
+    stt_auto_min_sec: float = 2.5
+    stt_threads: int | None = None   # faster-whisper cpu_threads; None = library default
+    stt_timeout: float = 120.0       # hard cap for one transcription, seconds
     # Per-utterance spectral gate before Whisper. Best for steady room noise.
     noise_suppression_enabled: bool = True
     noise_suppression_strength: float = Field(default=0.75, ge=0.0, le=1.0)
 
     tts_engine: str = "auto"  # "auto" (pyttsx3 on Windows, Piper elsewhere) | "pyttsx3" | "piper"
     tts_voice: str = "zira"
-    tts_model_path: str | None = None  # required when tts_engine == "piper"
+    tts_model_path: str | None = None  # required when tts_engine == "piper"; the default voice
+    # language (code or English name) -> Piper voice .onnx path. A missing language speaks with the default voice.
+    tts_voice_map: dict[str, str] = Field(default_factory=dict)
 
     mic_device_index: int | None = None
     speaker_device_index: int | None = None

@@ -16,6 +16,7 @@ from core.logging_config import logger
 from domain.entities.fact_query import FactQuery
 from domain.entities.place import Place
 from domain.policies.coordinate_policy import parse_lat_lon
+from domain.policies.place_names import normalize_place_name, to_latin
 from exceptions.exception import AppException
 from service.lookup.lookup_service import LookupService
 
@@ -32,6 +33,10 @@ class PlaceResolver:
 
     async def resolve(self, name: str | None) -> Place:
         wanted = " ".join((name or "").split())
+        normalized = normalize_place_name(wanted)
+        if normalized != wanted:
+            logger.info(f"[place] normalized {wanted!r} -> {normalized!r}")
+        wanted = normalized
         if wanted.lower() in _HERE_WORDS:
             place = await self._geocode(self._default_place, source="default")
             if place is None:
@@ -40,6 +45,13 @@ class PlaceResolver:
         place = await self._geocode(wanted, source="geocoder")
         if place is not None:
             return place
+        latin = to_latin(wanted)
+        if latin != wanted:
+            logger.info(f"[place] retrying with transliterated name {wanted!r} -> {latin!r}")
+            place = await self._geocode(latin, source="geocoder")
+            if place is not None:
+                return place
+            wanted = latin
         place = await self._from_search(wanted)
         if place is not None:
             return place

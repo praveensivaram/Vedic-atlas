@@ -119,4 +119,4 @@ def test_the_tools_own_cap_is_applied_before_composition():
 def test_unknown_content_task_is_a_programming_error():
     import pytest
     with pytest.raises(ValueError):
-        _composer().content_stage("translate", "doc", "q")
+        _composer().content_stage("summarize", "doc", "q")

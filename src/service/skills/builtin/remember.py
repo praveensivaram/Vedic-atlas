@@ -12,7 +12,7 @@ template), so the confirmation is always backed by what was really written.
 
 from __future__ import annotations
 
-from core.logging_config import logger
+from core.logging_config import logger, log_text
 from domain.entities.agent_context import AgentContext
 from domain.entities.skill_result import SkillResult
 from domain.entities.tool_manifest import ToolManifest
@@ -71,7 +71,7 @@ class RememberSkill(ManifestSkill):
             )
         stored, previous = self._knowledge.remember(topic, value)
         name = normalise_topic(topic)
-        logger.info(f"[remember] saved {stored!r}" + (f" (replaced {previous!r})" if previous else ""))
+        logger.info(f"[remember] saved {log_text(stored)}" + (f" (replaced {log_text(previous)})" if previous else ""))
         if previous is None:
             return self._ok(f"Saved: {stored}", f"Got it, I'll remember that your {name} is {value}.")
         if previous.lower() == value.lower():
@@ -90,7 +90,7 @@ class RememberSkill(ManifestSkill):
                 f"Nothing saved about '{topic}'. Nothing was changed.",
                 f"I don't have anything saved about {normalise_topic(topic)}.",
             )
-        logger.info(f"[remember] forgot {removed!r}")
+        logger.info(f"[remember] forgot {log_text(removed)}")
         return self._ok(f"Forgot: {removed}", f"Okay, I've forgotten your {normalise_topic(topic)}.")
 
     def _list(self) -> SkillResult:

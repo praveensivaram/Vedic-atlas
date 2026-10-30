@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from datetime import datetime, time, timedelta
 
-from core.logging_config import logger
+from core.logging_config import logger, log_text
 from domain.entities.agent_context import AgentContext
 from domain.entities.skill_result import SkillResult
 from domain.entities.tool_manifest import ToolManifest
@@ -147,7 +147,7 @@ class TasksSkill(ManifestSkill):
                 f"More than one task matches '{query}': {options}. Ask the user which one.",
                 f"Which one do you mean: {names}?",
             )
-        logger.info(f"[tasks] resolved '{query}' -> #{matches[0].id} {matches[0].title!r}")
+        logger.info(f"[tasks] resolved '{query}' -> #{matches[0].id} {log_text(matches[0].title)}")
         return matches[0]
 
     @staticmethod
@@ -194,7 +194,7 @@ class TasksSkill(ManifestSkill):
         try:
             at = time.fromisoformat(text)
         except ValueError:
-            logger.warning(f"[tasks] unparseable due_at {text!r}: task added without a reminder")
+            logger.warning(f"[tasks] unparseable due_at {log_text(text)}: task added without a reminder")
             return None
         now = now or datetime.now()
         due = datetime.combine(now.date(), at.replace(tzinfo=None))

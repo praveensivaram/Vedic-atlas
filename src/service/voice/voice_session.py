@@ -34,7 +34,7 @@ import time
 from datetime import datetime
 from typing import Any, Callable
 
-from core.logging_config import logger, reset_voice_turn_id, set_voice_turn_id
+from core.logging_config import logger, log_text, reset_voice_turn_id, set_voice_turn_id
 from domain.entities.agent_context import AgentContext
 from domain.entities.utterance import Utterance
 from domain.policies.transcript_policy import artifact_reason
@@ -231,7 +231,16 @@ class VoiceSession:
             "armed": self._is_armed(),
             "speaker_id_enabled": self._speaker_id is not None,
             "require_known_speaker": self._require_known_speaker,
+            "stt_language": getattr(self._stt, "current_language", "?"),
         }
+
+    def set_stt_language(self, language: str) -> str:
+        """Pin the STT language ("en", "hi", ...) or "auto" for detection + sticky, at runtime."""
+        setter = getattr(self._stt, "set_language", None)
+        if not callable(setter):
+            raise ValueError("the configured STT backend has no language switch")
+        setter(language)
+        return getattr(self._stt, "current_language", language)
 
     # -- Loop -------------------------------------------------------------
 
@@ -724,7 +733,7 @@ class VoiceSession:
         # that is not something the user said, so it must not become a turn.
         reason = artifact_reason(text, utterance.duration_sec)
         if reason is not None:
-            logger.info(f"[voice] dropping probable STT artefact ({reason}): {text[:80]!r}")
+            logger.info(f"[voice] dropping probable STT artefact ({reason}): {log_text(text, 80)}")
             self._emit("artifact_ignored", {"reason": reason})
             return
 
@@ -744,12 +753,12 @@ class VoiceSession:
         # words back in. If what we just "heard" is essentially what we just
         # said, it isn't a user turn.
         if self._echo_guard and self._is_echo(text):
-            logger.warning(f"[voice] ignoring probable self-echo: {text[:60]!r}")
+            logger.warning(f"[voice] ignoring probable self-echo: {log_text(text, 60)}")
             self._emit("echo_ignored", {"text": text})
             return
 
         self._last_transcript = text
-        logger.info(f"[voice] heard: {text!r}")
+        logger.info(f"[voice] heard: {log_text(text)}")
         self._emit("transcript", {"text": text})
 
         ctx = AgentContext(user_message=text, from_voice=True)
@@ -777,7 +786,7 @@ class VoiceSession:
             f"elapsed_ms={(time.perf_counter() - turn_started) * 1000:.0f} "
             f"reply_chars={len(reply)}"
         )
-        logger.info(f"[voice] reply: {reply[:120]!r}")
+        logger.info(f"[voice] reply: {log_text(reply, 120)}")
         self._emit("reply", {"text": reply})
 
     def _is_echo(self, heard: str) -> bool:
@@ -814,12 +823,12 @@ class VoiceSession:
         await self._speak(text)
         return True
 
-    async def _speak(self, text: str) -> None:
+    async def _speak(self, text: str, language: str | None = None) -> None:
         """Synthesise and play with the mic held closed until playback truly ends."""
         self._speaking = True
         self._emit("speaking", {"text": text})
         try:
-            spoke, _ = await self._say_pcm(text)
+            spoke, _ = await self._say_pcm(text, language=language)
             if spoke:
                 await self._wait_playback()
         except Exception as e:
@@ -866,13 +875,13 @@ class VoiceSession:
                 sentence, buffer = self._pop_sentence(buffer)
                 while sentence:
                     reply_audio_started.set()
-                    spoke, _ = await self._say_pcm(sentence, timing)
+                    spoke, _ = await self._say_pcm(sentence, timing, language=ctx.metadata.get("language"))
                     spoke_anything = spoke or spoke_anything
                     sentence, buffer = self._pop_sentence(buffer)
             tail = buffer.strip()
             if tail:
                 reply_audio_started.set()
-                spoke, _ = await self._say_pcm(tail, timing)
+                spoke, _ = await self._say_pcm(tail, timing, language=ctx.metadata.get("language"))
                 spoke_anything = spoke or spoke_anything
             stream_finished_ms = (time.perf_counter() - stream_started) * 1000
             if spoke_anything:
@@ -931,16 +940,18 @@ class VoiceSession:
         cut = match.end()
         return buffer[:cut].strip(), buffer[cut:]
 
-    async def _say_pcm(self, text: str, timing: dict | None = None) -> tuple[bool, float]:
+    async def _say_pcm(self, text: str, timing: dict | None = None, language: str | None = None) -> tuple[bool, float]:
         async with self._speech_lock:
-            return await self._synthesize_pcm(text, timing)
+            return await self._synthesize_pcm(text, timing, language=language)
 
-    async def _synthesize_pcm(self, text: str, timing: dict | None = None) -> tuple[bool, float]:
+    async def _synthesize_pcm(
+        self, text: str, timing: dict | None = None, language: str | None = None
+    ) -> tuple[bool, float]:
         started = time.perf_counter()
         spoke = False
         audio_bytes = 0
         logger.info(f"[voice][flow] stage=tts_synthesis_started chars={len(text)}")
-        async for pcm in self._tts.synthesize(text):
+        async for pcm in self._tts.synthesize(text, voice=language):
             if pcm:
                 self._speaker.play_pcm(pcm, self._tts.sample_rate)
                 spoke = True

@@ -414,6 +414,11 @@ class VedaClient:
         r.raise_for_status()
         return r.json()
 
+    def set_voice_language(self, language: str) -> dict[str, Any]:
+        r = self._http.post(f"{self.server_url}/api/voice/language", json={"language": language})
+        r.raise_for_status()
+        return r.json()
+
     def set_mute(self, muted: bool) -> dict[str, Any]:
         r = self._http.post(f"{self.server_url}/api/privacy/mute", json={"muted": muted})
         r.raise_for_status()

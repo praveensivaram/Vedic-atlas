@@ -31,7 +31,8 @@ def _t(role, content):
 def test_control_schema_shape_and_default_key_order():
     s = build_control_schema(MANIFESTS)
     assert list(s["properties"]) == list(CONTROL_KEYS)
-    assert s["required"] == ["needs_live_data", "calls"]   # advise / also_chat / clarification are optional: written only when set
+    # advise / also_chat / clarification are optional; language is required so the reply can be localised
+    assert s["required"] == ["needs_live_data", "calls", "language"]
     assert CONTROL_KEYS[0] == "needs_live_data"            # the flag is committed to before the calls
     assert s["additionalProperties"] is False
     calls = s["properties"]["calls"]
@@ -46,7 +47,7 @@ def test_control_schema_can_never_force_a_call():
 
 
 def test_control_schema_key_order_is_configurable_but_must_be_a_permutation():
-    order = ("calls", "needs_live_data", "advise", "also_chat", "clarification")
+    order = ("calls", "needs_live_data", "advise", "also_chat", "clarification", "language")
     s = build_control_schema(MANIFESTS, key_order=order)
     assert list(s["properties"]) == list(order)
     with pytest.raises(ValueError):
@@ -57,17 +58,17 @@ def test_control_schema_validates_real_decisions():
     jsonschema = pytest.importorskip("jsonschema")
     schema = build_control_schema(MANIFESTS)
     ok = [
-        {"needs_live_data": False, "calls": [], "clarification": None},
-        {"needs_live_data": True, "calls": [{"tool": "get_weather", "args": {"place": "Tokyo"}}], "clarification": None},
-        {"needs_live_data": False, "calls": [], "clarification": "Which task do you mean?"},
+        {"needs_live_data": False, "calls": [], "language": "English"},
+        {"needs_live_data": True, "calls": [{"tool": "get_weather", "args": {"place": "Tokyo"}}], "language": "English"},
+        {"needs_live_data": False, "calls": [], "clarification": "Which task do you mean?", "language": "English"},
     ]
     for doc in ok:
         jsonschema.validate(doc, schema)
     bad = [
-        {"needs_live_data": False, "calls": [{"tool": "rm_rf", "args": {}}], "clarification": None},        # unknown tool
-        {"needs_live_data": False, "calls": [{"tool": "tasks", "args": {"action": "zap"}}], "clarification": None},
-        {"needs_live_data": False, "calls": [], "clarification": "x" * 201},
-        {"calls": [], "clarification": None},                                                                # flag missing
+        {"needs_live_data": False, "calls": [{"tool": "rm_rf", "args": {}}], "language": "English"},        # unknown tool
+        {"needs_live_data": False, "calls": [{"tool": "tasks", "args": {"action": "zap"}}], "language": "English"},
+        {"needs_live_data": False, "calls": [], "clarification": "x" * 201, "language": "English"},
+        {"calls": [], "clarification": None, "language": "English"},                                         # flag missing
     ]
     for doc in bad:
         with pytest.raises(jsonschema.ValidationError):
@@ -125,7 +126,7 @@ def test_prompt_examples_only_reference_real_tools_and_args():
 
 
 def test_examples_follow_the_schema_key_order():
-    for order in (CONTROL_KEYS, ("calls", "needs_live_data", "advise", "also_chat", "clarification")):
+    for order in (CONTROL_KEYS, ("calls", "needs_live_data", "advise", "also_chat", "clarification", "language")):
         system = _composer().control_stage("x", key_order=order).system
         lines = [l for l in system.splitlines() if l.startswith("{") and "needs_live_data" in l and "calls" in l]
         assert len(lines) >= 8

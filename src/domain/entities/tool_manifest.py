@@ -30,6 +30,7 @@ class ToolParam:
     required: bool = False
     enum: tuple[str, ...] = ()
     description: str = ""
+    format: str | None = None   # "latin": a proper name (place/query) the model must transliterate to Latin
 
 
 @dataclass(frozen=True)

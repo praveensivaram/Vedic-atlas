@@ -27,6 +27,7 @@ from typing import Callable, Sequence
 
 from domain.entities.conversation import Turn
 from domain.entities.tool_manifest import ToolManifest, ToolParam
+from domain.policies.language_policy import language_of
 from domain.policies.tool_call_schema import CONTROL_KEYS
 from domain.policies.token_budget_policy import PromptBudgets, estimate_tokens
 from domain.ports.tool_manifest_store_port import PromptStorePort
@@ -111,7 +112,11 @@ class PromptComposer:
         for m in self._manifests.values():
             for ex in m.examples:
                 if ex.prompt_example:
-                    decision = {"needs_live_data": True, "calls": list(ex.calls)}
+                    decision = {
+                        "needs_live_data": True,
+                        "calls": list(ex.calls),
+                        "language": language_of(ex.user) or "English",
+                    }
                     lines.append(f"User: {ex.user}\n" + json.dumps(decision, separators=(",", ":"), ensure_ascii=False))
         return "\n".join(lines)
 
@@ -185,17 +190,36 @@ class PromptComposer:
         }
         return ComposedPrompt(system=system, prompt=volatile, tokens=total, sections=sections, trimmed=trimmed)
 
-    def narrate_stage(self, user_message: str, tool_results: Sequence[str]) -> ComposedPrompt:
+    def narrate_stage(self, user_message: str, tool_results: Sequence[str], language: str | None = None) -> ComposedPrompt:
         """Phrase tool results for the user: the `narrate` task of the content stage."""
         result = "\n".join(r.strip() for r in tool_results if r and r.strip())
-        return self.content_stage("narrate", result, user_message)
+        return self.content_stage("narrate", result, user_message, language=language)
 
-    def content_stage(self, task: str, document: str, user_message: str, *, max_tokens: int = 0) -> ComposedPrompt:
+    def translate_stage(self, text: str, language: str) -> ComposedPrompt:
+        """Translate ONE finished template sentence into `language`, facts untouched.
+
+        Deliberately carries no QUESTION / user text: a weak model that sees the user's own sentence beside
+        "translate into <language>" repeats the question instead of translating TEXT (the echo bug)."""
+        system = self._prompts.get("translate")
+        clipped = self.cap_tokens(text, self.budgets.observation_max)
+        prompt = f"TARGET LANGUAGE: {language}\nTEXT:\n{clipped}\n\nTRANSLATION:"
+        return ComposedPrompt(
+            system=system,
+            prompt=prompt,
+            tokens=self._count(system) + self._count(prompt),
+            sections={"static": self._count(system), "text": self._count(clipped)},
+        )
+
+    def content_stage(
+        self, task: str, document: str, user_message: str, *, max_tokens: int = 0, language: str | None = None
+    ) -> ComposedPrompt:
         """The data plane: reason over ONE capped document. No tool list, no history, ever.
 
         SYSTEM is the same for every task (persona + preamble), so all tasks share one cached prefix; the task
         instruction rides in the volatile tail. `max_tokens` is the producing tool's `max_result_tokens`, applied
-        before anything else; the stage's own `observation_max` / `narrate` budgets still apply after it."""
+        before anything else; the stage's own `observation_max` / `narrate` budgets still apply after it.
+        `language` is the turn's language (from the control decode or the deterministic detector); when it is
+        None the detector runs on the question itself."""
         if task not in CONTENT_TASKS:
             raise ValueError(f"unknown content task {task!r}; expected one of {sorted(CONTENT_TASKS)}")
         system = f"{self._prompts.get('persona_lite')}\n\n{self._prompts.get('content_stage')}"
@@ -212,9 +236,13 @@ class PromptComposer:
                 trimmed.append("tool_result")
         question = self._clip(user_message, self._user_msg_chars)
         today = f"TODAY: {self._now().strftime('%d %b %Y')}"
+        language = language or language_of(user_message)
+        # Tool results are often English (a provider's numbers/headers); naming the language keeps the
+        # narration in the user's, not the tool's, language.
+        language_line = f"\nLANGUAGE: the user wrote in {language}; answer in {language}." if language else ""
 
         def build(doc: str) -> str:
-            return f"TASK: {instruction}\n{today}\nQUESTION: {question}\n{label}:\n{doc}\n\nAnswer:"
+            return f"TASK: {instruction}\n{today}\nQUESTION: {question}\n{label}:\n{doc}{language_line}\n\nAnswer:"
 
         prompt = build(result)
         total = self._count(system) + self._count(prompt)
