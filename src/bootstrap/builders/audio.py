@@ -117,9 +117,20 @@ def build_stt(cfg: AppConfig):
         from core.constants import PROJECT_ROOT
         from tpa.stt.faster_whisper import FasterWhisperProvider
 
+        backend = (cfg.audio.stt_backend or "faster_whisper").strip().lower()
+        if backend not in ("faster_whisper", "whisper_cpp"):
+            logger.warning(f"[voice] unknown stt_backend {backend!r}; using faster_whisper")
+            backend = "faster_whisper"
+        if backend == "whisper_cpp":
+            # The adapter lands in the Pi phase; until then the laptop backend keeps voice working.
+            logger.warning("[voice] stt_backend=whisper_cpp is not wired yet; using faster_whisper")
         provider_options = {
             "noise_suppression_enabled": cfg.audio.noise_suppression_enabled,
             "noise_suppression_strength": cfg.audio.noise_suppression_strength,
+            "language": cfg.audio.stt_language,
+            "threads": cfg.audio.stt_threads,
+            "timeout": cfg.audio.stt_timeout,
+            "auto_min_sec": cfg.audio.stt_auto_min_sec,
         }
         path = cfg.audio.stt_model_path
         if path:
@@ -128,7 +139,13 @@ def build_stt(cfg: AppConfig):
                 logger.warning(f"[voice] STT model not found at {resolved}; STT disabled")
                 return None
             # faster-whisper accepts a directory in place of a size name.
+            logger.info(
+                f"[voice] STT backend={backend} model={resolved} language={cfg.audio.stt_language!r}"
+            )
             return FasterWhisperProvider(model_size=str(resolved), **provider_options)
+        logger.info(
+            f"[voice] STT backend={backend} model={cfg.audio.stt_model!r} language={cfg.audio.stt_language!r}"
+        )
         return FasterWhisperProvider(model_size=cfg.audio.stt_model, **provider_options)
     except Exception as e:
         logger.info(f"[voice] STT unavailable ({e})")

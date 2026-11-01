@@ -20,15 +20,19 @@ from dataclasses import replace
 from datetime import datetime
 from typing import AsyncIterator, Callable, Mapping, Sequence, Awaitable
 
-from core.logging_config import logger
+from core.logging_config import logger, log_text
 from domain.entities.agent_context import AgentContext
 from domain.entities.agent_result import AgentResult
 from domain.entities.control_decision import ControlDecision
 from domain.entities.session_context import SessionContext
 from domain.entities.tool_manifest import REPLY_TEMPLATE, RETURNS_DOCUMENT, ToolManifest
 from domain.entities.turn_trace import TurnTrace
+from domain.policies.argument_policy import normalize_latin_arguments
 from domain.policies.dispatch_policy import Resolution, Route, resolve
 from domain.policies.grounding_policy import is_grounded, states_a_measurement
+from domain.policies.echo_policy import is_echo
+from domain.policies.grounding_policy import is_grounded
+from domain.policies.language_policy import language_of, looks_like_text, normalise_language
 from domain.policies.reply_policy import (
     ADVISE_MODE, FAILED, NARRATE, SPOKEN, UNCONFIRMED_REPLY, classify_call, failure_text, resolve_reply_mode, spoken_text,
 )
@@ -75,6 +79,10 @@ class AssistantOrchestrator(BaseAgent):
         mixed_intent: bool = False,
         parallel_tool_calls: bool = False,
         room_context: Callable[[], str] | None = None,
+        multilingual: bool = True,
+        reject_unknown_language: bool = True,
+        unknown_language_reply: str = "Sorry, I didn't understand that. Could you say it again?",
+        min_language_letters: int = 8,
     ):
         super().__init__(
             name="assistant", model=model,
@@ -107,6 +115,13 @@ class AssistantOrchestrator(BaseAgent):
         self._mixed_intent = adaptive_reply and mixed_intent
         self._parallel_tool_calls = parallel_tool_calls
         self._room_context = room_context   # () -> the ROOM line, or "" when there is no fresh reading
+        # Multilingual: the control decode names the language; the deterministic detector overrides it for the
+        # scripts it knows. An unnamed language on a message that reads as language gets a fixed "I did not
+        # understand" instead of a guessed English answer.
+        self._multilingual = multilingual
+        self._reject_unknown_language = reject_unknown_language
+        self._unknown_language_reply = unknown_language_reply
+        self._min_language_letters = min_language_letters
 
     @staticmethod
     def _default_grounding(reply: str, results: Sequence[str], user_message: str) -> bool:
@@ -146,10 +161,14 @@ class AssistantOrchestrator(BaseAgent):
             state = self._session_state.get(ctx.session_id, ctx.speaker_id)
         active = self._session_state.render_active(state) if (self._session_state and state) else ""
         history = self._conversation.turns if self._conversation is not None else []
-        logger.info(f"[turn] user={ctx.user_message!r} voice={ctx.from_voice}")
+        logger.info(f"[turn] user={log_text(ctx.user_message)} voice={ctx.from_voice}")
         result = await self._decoder.decide(ctx.user_message, history, active)
+        normalized, arg_notes = normalize_latin_arguments(result.decision, self._manifests)
+        if arg_notes:
+            result = replace(result, decision=normalized)
+            logger.info(f"[control] normalized Latin tool args: {arg_notes}")
         logger.info(
-            f"[control] raw={result.raw!r} -> calls={len(result.decision.calls)} advise={result.decision.advise} "
+            f"[control] raw={log_text(result.raw)} -> calls={len(result.decision.calls)} advise={result.decision.advise} "
             f"also_chat={result.decision.also_chat} needs_live_data={result.decision.needs_live_data} "
             f"flags: adaptive_reply={self._adaptive_reply} mixed_intent={self._mixed_intent} parallel={self._parallel_tool_calls}"
         )
@@ -170,16 +189,27 @@ class AssistantOrchestrator(BaseAgent):
             except Exception as e:   # the check is an extra; never let it take the turn down
                 logger.warning(f"[control] conversation-intent check failed: {type(e).__name__}")
         outcome = TurnOutcome(reply=None)
+        outcome.notes.extend(arg_notes)
         outcome.timings_ms["control"] = result.ms
         outcome.prompt_tokens["control"] = result.prompt_tokens
         if result.trimmed:
             outcome.notes.append(f"control prompt trimmed: {list(result.trimmed)}")
         if not result.decision.valid:
             outcome.notes.append(f"control decision invalid: {result.decision.note}")
+        # The model's own label for the turn, with the deterministic detector overriding it for the scripts it
+        # reads exactly (so Telugu/Hindi/German can never be mislabelled).
+        language = language_of(ctx.user_message) or normalise_language(result.decision.language)
+        if self._multilingual:
+            if language:
+                ctx.metadata["language"] = language
+            elif result.decision.language is not None:
+                # The model carried a language key but could not name a language ("unknown"). Only an explicit
+                # answer can trigger the "I didn't understand" reply: an older/absent key is permissive.
+                ctx.metadata["language_unknown"] = True
         logger.info(
             f"[control] route={resolution.route.value} live={result.decision.needs_live_data} "
             f"calls={[c.get('tool') for c in resolution.calls]} ms={result.ms} tokens={result.prompt_tokens} "
-            f"active={active!r} user={ctx.user_message!r}"
+            f"lang={log_text(language)} active={log_text(active)} user={log_text(ctx.user_message)}"
         )
         return result, resolution, state, active, outcome
 
@@ -284,7 +314,7 @@ class AssistantOrchestrator(BaseAgent):
             if chat_text == UNCONFIRMED_REPLY or states_a_measurement(chat_text):
                 # A claim of an action, or a measurement: the chat half started before the tool result existed, so
                 # either one can only be invented. The verified tool sentence stands alone.
-                logger.warning(f"[tool-guard] chat half of a mixed turn dropped: {chat_text[:160]!r}")
+                logger.warning(f"[tool-guard] chat half of a mixed turn dropped: {log_text(chat_text, 160)}")
                 outcome.notes.append("chat half dropped")
                 chat_text = ""
         private = any(self._manifests[c.tool].private for c in outcome.calls)
@@ -329,14 +359,17 @@ class AssistantOrchestrator(BaseAgent):
                 if narration is None:
                     outcome.notes.append("advise fell back to the tool sentences")
         pieces: list[str] = []
+        templated: list[int] = []   # positions holding an English template/fallback sentence
         narration_placed = False
         for c, kind in zip(calls, kinds):
             if kind == FAILED:
                 # The skill's own sentence when it gave one ("Which app do you mean?", "I can't check your email yet because
                 # it isn't set up"); the generic text with the raw error only for a failure that came with no sentence.
                 pieces.append(c.spoken or failure_text(c.error))
+                templated.append(len(pieces) - 1)
             elif kind == SPOKEN:
                 pieces.append(spoken_text(c.spoken, c.observation))
+                templated.append(len(pieces) - 1)
             elif narration is not None:
                 if not narration_placed:
                     pieces.append(narration)
@@ -348,12 +381,54 @@ class AssistantOrchestrator(BaseAgent):
                     # which feeds later prompts, so it is cut: a document must not leak into any control prompt.
                     text = self._composer.cap_tokens(text, _DOCUMENT_FALLBACK_TOKENS)
                 pieces.append(text)
-        return " ".join(pieces)
+                templated.append(len(pieces) - 1)
+        language = ctx.metadata.get("language")
+        if templated and language and language.lower() != "english":
+            # Template sentences are English by construction (the adapter builds them). Translate them only now,
+            # as one finished sentence, so the verbs/names/numbers stay the tool's and English turns pay nothing.
+            joined = " ".join(pieces[i] for i in templated)
+            translated = await self._localize(joined, language, ctx, outcome)
+            if translated:
+                for i in templated:
+                    pieces[i] = ""
+                pieces[templated[0]] = translated
+        return " ".join(piece for piece in pieces if piece)
+
+    async def _localize(self, text: str, language: str, ctx: AgentContext, outcome: TurnOutcome) -> str | None:
+        """Translate one finished template sentence into the turn's language.
+
+        The prompt carries the sentence only (never the user's question). A reply that repeats the user's
+        message, or whose numbers are not in the sentence, is rejected: the English sentence is kept."""
+        stage = self._composer.translate_stage(text, language)
+        outcome.prompt_tokens["translate"] = stage.tokens
+        for attempt in range(2):
+            try:
+                translated = (await self._client.complete(
+                    prompt=stage.prompt, system=stage.system, model=self.model,
+                    temperature=self._narrate_temperature if attempt == 0 else 0.6,
+                    num_predict=max(self._narrate_num_predict, 120),
+                )).strip()
+            except Exception as e:
+                logger.warning(f"[language] template translation failed: {e}")
+                return None
+            if not translated:
+                continue
+            if is_echo(translated, ctx.user_message):
+                logger.warning(f"[language] template translation echoed the user: {log_text(translated, 120)}")
+                outcome.notes.append("template translation echoed the user")
+                continue
+            if not is_grounded(translated, [text]):
+                logger.warning(f"[language] rejected ungrounded template translation: {log_text(translated, 120)}")
+                outcome.notes.append("template translation rejected (ungrounded)")
+                return None
+            outcome.notes.append(f"template reply translated to {language}")
+            return translated
+        return None
 
     def _backstop(self, reply: str, outcome: TurnOutcome) -> str:
         """claims_action on EVERY reply path. A claim is only legitimate if a tool actually succeeded this turn."""
         if self._claims_action is not None and not any(c.ok for c in outcome.calls) and self._claims_action(reply):
-            logger.warning(f"[tool-guard] reply claimed an action with no successful tool call: {reply[:160]!r}")
+            logger.warning(f"[tool-guard] reply claimed an action with no successful tool call: {log_text(reply, 160)}")
             outcome.notes.append("reply claimed an action; refused")
             return UNCONFIRMED_REPLY
         return reply
@@ -372,7 +447,7 @@ class AssistantOrchestrator(BaseAgent):
         else:
             reply = await self._run_tools(ctx, res.calls, outcome, advise=res.advise)
         if res.follow_up:   # a held call or the model's own question: asked AFTER what could be answered
-            logger.info(f"[plan] follow-up question after the tool answer: {res.follow_up!r}")
+            logger.info(f"[plan] follow-up question after the tool answer: {log_text(res.follow_up)}")
             outcome.notes.append("follow-up question asked")
             reply = f"{reply} {res.follow_up}".strip()
         return reply
@@ -382,8 +457,24 @@ class AssistantOrchestrator(BaseAgent):
         logger.info(
             f"[reply] route={res.route.value} mode={outcome.reply_mode or 'template'} decodes={sorted(k for k in outcome.timings_ms if k in ('control', 'narrate', 'chat'))} "
             f"timings_ms={outcome.timings_ms} total_ms={int((time.perf_counter() - started) * 1000)} notes={outcome.notes} "
-            f"reply={'<private>' if private else reply[:300]!r}"
+            f"reply={'<private>' if private else log_text(reply, 300)}"
         )
+
+    def _unknown_language(self, ctx: AgentContext, resolution: Resolution, outcome: TurnOutcome) -> str | None:
+        """The fixed "I didn't understand" reply, or None when this turn may go ahead.
+
+        Only a plain chat turn can be rejected: if the model picked a tool or asked a clarification, it
+        demonstrably understood the message regardless of whether it could name the language. The
+        `looks_like_text` guard keeps "2+2" and "ok" from being called unreadable."""
+        if not (self._multilingual and self._reject_unknown_language):
+            return None
+        if resolution.route is not Route.CHAT or not ctx.metadata.get("language_unknown"):
+            return None
+        if not looks_like_text(ctx.user_message, self._min_language_letters):
+            return None
+        logger.info(f"[language] no language named for {log_text(ctx.user_message, 80)}; asking the user to repeat")
+        outcome.notes.append("unknown language: asked the user to repeat")
+        return self._unknown_language_reply
 
     # ---- persistence & trace ------------------------------------------------
 
@@ -456,10 +547,16 @@ class AssistantOrchestrator(BaseAgent):
         started = time.perf_counter()
         try:
             result, res, state, active, outcome = await self._decide(ctx)
+            unknown = self._unknown_language(ctx, res, outcome)
+            if unknown is not None:
+                self._persist(ctx, unknown)
+                self._write_state(ctx, outcome)
+                self._record_trace(ctx, res.route, result.decision, outcome, unknown, started, state, active)
+                return AgentResult(agent_name=self.name, response=unknown)
             if res.route is Route.CHAT:
                 self._add_room_context(ctx)
                 chat = await self._responder.execute(ctx)
-                logger.info(f"[reply] route=chat room_context={'ROOM' in ctx.system_context} reply={chat.response[:300]!r}")
+                logger.info(f"[reply] route=chat room_context={'ROOM' in ctx.system_context} reply={log_text(chat.response, 300)}")
                 self._record_trace(ctx, res.route, result.decision, outcome, chat.response, started, state, active)
                 chat.delegated_to = self._responder.name
                 return chat
@@ -480,6 +577,13 @@ class AssistantOrchestrator(BaseAgent):
         started = time.perf_counter()
         try:
             result, res, state, active, outcome = await self._decide(ctx)
+            unknown = self._unknown_language(ctx, res, outcome)
+            if unknown is not None:
+                self._persist(ctx, unknown)
+                self._write_state(ctx, outcome)
+                self._record_trace(ctx, res.route, result.decision, outcome, unknown, started, state, active)
+                yield unknown
+                return
             if res.route is Route.CHAT:
                 self._add_room_context(ctx)
                 async for chunk in self._responder.execute_stream(ctx, cancel_event=cancel_event):

@@ -6,4 +6,6 @@ PY=python3
 for venv in "${VENV:-}" .venv vedic-atlas-env; do
   if [ -n "$venv" ] && [ -x "$venv/bin/python" ]; then PY="$venv/bin/python"; break; fi
 done
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
 PYTHONPATH=src exec "$PY" -m controller.cli "$@"

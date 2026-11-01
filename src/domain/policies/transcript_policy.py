@@ -17,7 +17,9 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-_WORD_RE = re.compile(r"[a-z0-9']+")
+# Any script: an ASCII-only word regex made every Devanagari/Telugu/Japanese transcript
+# look like "symbols only" and the loop dropped it as an artefact.
+_WORD_RE = re.compile(r"[^\W_]+(?:'[^\W_]+)?", re.UNICODE)
 _SOUND_TAG_RE = re.compile(r"\s*[\[\(\*].{0,40}[\]\)\*]\s*")  # "[music]", "(applause)", "*sigh*"
 
 # Stock phrases Whisper emits for noise/silence (training-data artefacts).
@@ -47,7 +49,7 @@ def artifact_reason(text: str, duration_sec: float = 0.0) -> str | None:
     raw = (text or "").strip()
     if not raw:
         return "empty"
-    if not re.search(r"[a-zA-Z]", raw):
+    if not any(char.isalpha() for char in raw):
         return "no letters (symbols or music notes only)"
     if _SOUND_TAG_RE.fullmatch(raw):
         return "sound tag"

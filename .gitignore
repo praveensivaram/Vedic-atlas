@@ -1,4 +1,6 @@
 .env
+.idea/
+graphify-out/
 __pycache__/
 *.pyc
 data/

@@ -47,6 +47,7 @@ dependencies = [
     # --- local language model (config/inference.yaml: backend=llama_cpp) ---
     "llama-cpp-python>=0.3.0",  # needs a C/C++ toolchain + cmake where no wheel exists
 
+    "unidecode>=1.3",         # transliterate place/query arguments (format: latin)
     # --- voice pipeline (config/audio.yaml) ---
     "sounddevice>=0.4.6",       # microphone + speaker; needs PortAudio (apt: libportaudio2)
     "faster-whisper>=1.0.0",    # speech-to-text (model staged at data/models/whisper-base.en)

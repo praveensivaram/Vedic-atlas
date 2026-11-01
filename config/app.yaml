@@ -2,6 +2,14 @@ name: Veda
 port: 8000
 max_history: 30
 log_level: INFO
+
+# Reply in the language the user wrote in. When neither the deterministic detector
+# nor the control model can name the language, say so instead of guessing English.
+multilingual:
+  enabled: true
+  reject_unknown: true
+  min_letters: 8
+  unknown_reply: "Sorry, I didn't understand that. Could you say it again?"
 adaptive_reply: true   # docs/12: let the control decision ask for a reasoned reply (advise) or a mixed tool+chat reply (also_chat)
 mixed_intent: true     # docs/12 P7: with adaptive_reply, answer the no-tool part of a mixed message beside the tool call
 parallel_tool_calls: true   # docs/12 P8: run several auto-permission lookups at once (saves the network wait of all but the slowest)

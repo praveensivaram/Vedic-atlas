@@ -14,6 +14,7 @@ declared in VedaConfig.log_level but never read).
 """
 
 import logging
+import sys
 from contextvars import ContextVar, Token
 
 _request_id: ContextVar[str] = ContextVar("request_id", default="-")
@@ -64,8 +65,35 @@ class _RequestIdFilter(logging.Filter):
         return True
 
 
+
+def log_text(value: object, limit: int | None = None) -> str:
+    """Readable single-line text for logs.
+
+    `repr()` renders Devanagari/Telugu/Japanese as \\uXXXX escapes, which makes voice and user-message logs
+    useless. This keeps the characters as they are and escapes only the control characters that would break a
+    log line (newline, carriage return, tab, backslash)."""
+    text = "" if value is None else str(value)
+    if limit is not None:
+        text = text[:limit]
+    return (
+        text.replace("\\", "\\\\")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+        .replace("\t", "\\t")
+    )
+
+
+def _force_utf8_streams() -> None:
+    """Write Devanagari/Telugu to redirected logs instead of the Windows locale code page."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError, ValueError):
+            pass
+
 def configure_logging(level: str = "INFO") -> logging.Logger:
     """Build and return the app logger. Call once at process startup."""
+    _force_utf8_streams()
     logger = logging.getLogger("veda")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
     if not any(isinstance(item, _RequestIdFilter) for item in logger.filters):

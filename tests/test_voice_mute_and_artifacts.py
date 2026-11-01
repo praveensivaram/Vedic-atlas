@@ -168,7 +168,7 @@ def test_slow_voice_turn_speaks_processing_acknowledgement(monkeypatch):
         def __init__(self):
             self.spoken_texts = []
 
-        async def synthesize(self, text):
+        async def synthesize(self, text, voice=None):
             self.spoken_texts.append(text)
             yield b"\x00\x00" * 10
 
@@ -192,7 +192,7 @@ def test_fast_voice_turn_skips_processing_acknowledgement(monkeypatch):
         def __init__(self):
             self.spoken_texts = []
 
-        async def synthesize(self, text):
+        async def synthesize(self, text, voice=None):
             self.spoken_texts.append(text)
             yield b"\x00\x00" * 10
 
@@ -293,7 +293,7 @@ def test_voice_flow_logs_wake_command_turn_and_follow_up(caplog):
         def __init__(self):
             self.spoken = []
 
-        async def synthesize(self, text):
+        async def synthesize(self, text, voice=None):
             self.spoken.append(text)
             yield b"\x00\x00"
 
@@ -485,7 +485,7 @@ def test_turn_discards_audio_queued_while_assistant_is_processing(caplog):
 class _FakeTTS:
     sample_rate = 22050
 
-    async def synthesize(self, text):
+    async def synthesize(self, text, voice=None):
         yield b"\x00\x00" * 10
 
 

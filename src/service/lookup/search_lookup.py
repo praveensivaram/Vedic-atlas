@@ -13,7 +13,7 @@ from datetime import date
 from typing import Callable
 
 from core.enums import ErrorMessage, ExceptionCode
-from core.logging_config import logger
+from core.logging_config import logger, log_text
 from domain.entities.fact_query import FactQuery
 from domain.entities.tool_observation import ToolObservation
 from domain.policies.query_policy import resolve_relative_dates, results_look_relevant
@@ -104,19 +104,19 @@ class SearchLookup:
         # so relative dates become concrete ones before anything leaves the device.
         resolved = resolve_relative_dates(q, self._today())
         if resolved != q:
-            logger.info(f"[search] query dates resolved: {q!r} -> {resolved!r}")
+            logger.info(f"[search] query dates resolved: {log_text(q)} -> {log_text(resolved)}")
             q = resolved
 
         answer = await self._lookup.fetch(FactQuery(category="search", params={"query": q, "topic": topic}))
         if not self._on_topic(q, answer.data):
             # The provider's answer is machine-written and was sometimes about something else entirely
             # (Hollywood re-releases for a Tollywood question). Retry once with the deeper search.
-            logger.warning(f"[search] results for {q!r} look off-topic; retrying with advanced depth")
+            logger.warning(f"[search] results for {log_text(q)} look off-topic; retrying with advanced depth")
             answer = await self._lookup.fetch(
                 FactQuery(category="search", params={"query": q, "topic": topic, "depth": "advanced"})
             )
             if not self._on_topic(q, answer.data):
-                logger.warning(f"[search] results for {q!r} still look off-topic; refusing to report them")
+                logger.warning(f"[search] results for {log_text(q)} still look off-topic; refusing to report them")
                 raise AppException(
                     class_name="SearchLookup", code=ExceptionCode.NOT_FOUND, error_message=ErrorMessage.GENERIC,
                     detail=f"I couldn't find reliable results for '{q}'",

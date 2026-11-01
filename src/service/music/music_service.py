@@ -18,7 +18,7 @@ import asyncio
 import time
 from typing import Awaitable, Callable
 
-from core.logging_config import logger
+from core.logging_config import logger, log_text
 from domain.entities.music_track import MusicStatus, Track
 from domain.policies.music_policy import clean_query, pick_track
 from domain.ports.music_ports import MusicError, MusicPlayerPort, MusicResolverPort
@@ -112,7 +112,7 @@ class MusicService:
         self._gate.pause_capture(SOURCE)            # the mic closes now and stays closed until the music is gone
         self._state, self._track = STARTING, track
         self._start_task = asyncio.create_task(self._begin(track), name="MusicStart")
-        logger.info(f"[music] chosen {track.title!r} for {text!r} ({len(candidates)} hit(s)); starts when Veda is quiet")
+        logger.info(f"[music] chosen {log_text(track.title)} for {log_text(text)} ({len(candidates)} hit(s)); starts when Veda is quiet")
         return track
 
     async def stop(self, reason: str = "stop") -> bool:
@@ -148,7 +148,7 @@ class MusicService:
             self._state = PLAYING
             self._elapsed_before, self._stretch_start = 0.0, time.monotonic()
             self._arm_limit(self._max_seconds)
-            logger.info(f"[music] playing {track.title!r} (limit {self._max_seconds:.0f}s)")
+            logger.info(f"[music] playing {log_text(track.title)} (limit {self._max_seconds:.0f}s)")
         except asyncio.CancelledError:
             raise
         except Exception as e:

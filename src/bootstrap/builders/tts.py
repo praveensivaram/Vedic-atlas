@@ -45,8 +45,24 @@ def build_tts(cfg: AppConfig):
                 from tpa.tts.piper import PiperProvider
 
                 path = Path(model)
-                logger.info(f"[voice] TTS engine: piper ({path.name})")
-                return PiperProvider(model_path=path if path.is_absolute() else PROJECT_ROOT / path)
+                resolved = path if path.is_absolute() else PROJECT_ROOT / path
+                voices: dict[str, str] = {}
+                for language, raw in (cfg.audio.tts_voice_map or {}).items():
+                    voice_path = Path(raw)
+                    resolved_voice = voice_path if voice_path.is_absolute() else PROJECT_ROOT / voice_path
+                    if not resolved_voice.exists():
+                        logger.warning(
+                            f"[voice] TTS voice for {language!r} missing at {resolved_voice}; "
+                            "that language will use the default voice"
+                        )
+                        continue
+                    voices[language] = str(resolved_voice)
+                logger.info(
+                    f"[voice] TTS engine: piper (default={resolved.name}"
+                    + (f", languages={sorted(voices)}" if voices else "")
+                    + ")"
+                )
+                return PiperProvider(model_path=resolved, voices=voices)
         if engine == "pyttsx3":
             import pyttsx3  # noqa: F401  (Windows speech; not installed on Linux/Pi)
             from tpa.tts.pyttsx3_provider import Pyttsx3Provider
