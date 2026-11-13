@@ -173,7 +173,7 @@
 - {say: "what is the time?", category: clock, expect: {calls: [{tool: current_time, args: {}}]}}
 - {say: "what's the date today", category: clock, expect: {calls: [{tool: current_time, args: {what: date}}]}}
 - {say: "what mail did I send to manoj", category: google, expect: {calls: [{tool: gmail_search, args: {folder: sent}}]}}
-- {say: "did we send any mail to manojrouthu26@gmail.com", category: google, expect: {calls: [{tool: gmail_search, args: {folder: sent}}]}}
+- {say: "did we send any mail to manoj@example.com", category: google, expect: {calls: [{tool: gmail_search, args: {folder: sent}}]}}
 - {say: "where are you?", category: meta, expect: {calls: [], needs_live_data: false}}
 - say: "where did he live?"
   category: followup

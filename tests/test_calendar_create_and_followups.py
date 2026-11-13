@@ -228,15 +228,15 @@ class FakeMail:
 def sent_msg():
     return MailMessage(
         id="m1", sender_name="Me", sender_address="me@x.com", subject="Tomorrow's Calendar Invite",
-        recipients=("manojrouthu26@gmail.com",), recipient_names=("Manoj Routhu",),
+        recipients=("manoj@example.com",), recipient_names=("Manoj Routhu",),
     )
 
 
 def test_sent_folder_searches_in_sent_whatever_query_the_model_wrote():
     fm = FakeMail([sent_msg()])
     sk = GmailSearchSkill(fm, MANIFESTS["gmail_search"])
-    res = run(sk.execute(ctx(), folder="sent", query="to:manojrouthu26@gmail.com"))
-    assert fm.searches == ["in:sent to:manojrouthu26@gmail.com"]
+    res = run(sk.execute(ctx(), folder="sent", query="to:manoj@example.com"))
+    assert fm.searches == ["in:sent to:manoj@example.com"]
     assert res.metadata["spoken"] == "1 sent email. To Manoj Routhu: Tomorrow's Calendar Invite."
     run(sk.execute(ctx(), folder="sent"))
     assert fm.searches[-1] == "in:sent"

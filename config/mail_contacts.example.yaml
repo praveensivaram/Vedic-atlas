@@ -1,6 +1,5 @@
 # Optional Gmail draft recipients. Add one display name and address per entry.
 # Names are matched case-insensitively; add another entry for a nickname/alias.
-Manoj: manojrouthu26@gmail.com
-pradeep: chowdarypradeep.ch@gmail.com
-Manos: manojrouthu26@gmail.com
-ram: prabhasdino116@gmail.com
+# Copy this file to config/mail_contacts.yaml (git-ignored) and put your real contacts there.
+Alex: alex@example.com
+Sam: sam@example.com

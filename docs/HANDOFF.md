@@ -55,7 +55,7 @@ pytest -q                                          # expect all green except tes
 | Wake word | `data/models/openwakeword/hey_veda.onnx` + `.onnx.data` | tiny | trained model; only for voice |
 | bge-small embeddings | `data/bge-small-en-v1.5/` (`onnx/model.onnx`, `tokenizer.json`) | 130 MB | semantic memory; without it recall is off, not broken |
 | Piper voice (optional) | set `audio.tts_model_path` | 60 MB | Linux/Pi TTS |
-Secrets: `.env` (gitignored) holds `TAVILY_API_KEY` (web search) and optionally `VEDA_PROFILE=qwen3-4b|qwen3-1.7b|qwen3-0.6b`. Without the Tavily key `web_search` says it isn't set up; everything else works. A fresh `data/veda.db` is created on first run (the previous machine's conversations/tasks/saved facts are NOT transferred).
+Secrets: `.env` (gitignored) holds `TAVILY_API_KEY` (web search) and optionally `VEDA_PROFILE=qwen3-4b|qwen3-1.7b|qwen3-0.6b`. Without the Tavily key `web_search` says it isn't set up; everything else works. Mail contacts: copy `config/mail_contacts.example.yaml` to `config/mail_contacts.yaml` (gitignored) and add real names and addresses; without it `gmail_draft` knows no names. A fresh `data/veda.db` is created on first run (the previous machine's conversations/tasks/saved facts are NOT transferred).
 
 **First 15 minutes on the new machine**
 1. `pytest -q` (no model needed; includes the isolated bootstrap smoke test).

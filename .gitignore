@@ -18,3 +18,4 @@ src/veda.egg-info/entry_points.txt
 src/veda.egg-info/dependency_links.txt
 src/download_model.py
 training/datasets/build_*/
+config/mail_contacts.yaml
