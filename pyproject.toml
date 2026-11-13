@@ -29,6 +29,8 @@ build-backend = "setuptools.build_meta"
 name = "veda"
 version = "1.1.0"
 description = "Veda - personal offline"
+authors = [{ name = "Praveen Krovvidi" }]
+license = { text = "MIT" }
 requires-python = ">=3.12"
 dependencies = [
     # --- server + CLI ---

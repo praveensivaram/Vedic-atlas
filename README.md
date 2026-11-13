@@ -11,6 +11,10 @@ built, how the main parts work (orchestrator, memory, agents, skills), how it wa
 is not tested. Numbers come from saved runs or from the commands listed in [Tests and coverage](#tests-and-coverage).
 Anything not measured says so.
 
+**Author.** Vedic Atlas is designed and built by **Praveen Krovvidi** ([@praveensivaram](https://github.com/praveensivaram)):
+the architecture, the code, the voice loop, the orchestrator, memory, music, vision, the phone app and the Raspberry Pi
+setup. See [Origin and credits](#origin-and-credits) for how the project started.
+
 - [The problem and the constraints](#the-problem-and-the-constraints)
 - [What Veda can do today](#what-veda-can-do-today)
 - [System architecture](#system-architecture)
@@ -24,6 +28,7 @@ Anything not measured says so.
 - [Tests and coverage](#tests-and-coverage)
 - [Measured results and honest limits](#measured-results-and-honest-limits)
 - [Getting started](#getting-started) · [Phone app](#phone-app) · [More docs](#more-docs)
+- [Origin and credits](#origin-and-credits)
 
 ---
 
@@ -349,7 +354,8 @@ text-to-speech run on the phone. Design docs: [`docs/15-vision-mobile-design.md`
 
 ## How it was built: the sessions
 
-The project was built over about four weeks by a small team, in working sessions. Each row is one session; dates come from
+The project was built over about four weeks by Praveen Krovvidi, in working sessions, with support from teammates during
+the make-a-thon (see [Origin and credits](#origin-and-credits)). Each row is one session; dates come from
 the git history, results from the stage files in `docs/stages/` and the saved runs in `tests/eval/results/`.
 
 | Session | Date | What was done | Outcome |
@@ -648,3 +654,21 @@ Core:
 - [`docs/session-log.md`](docs/session-log.md) and [`docs/10-orchestrator-review-and-plan.md`](docs/10-orchestrator-review-and-plan.md): the orchestrator redesign and its measurements
 - [`docs/HANDOFF.md`](docs/HANDOFF.md): setting up on another machine, first-run checklist
 - [`training/README.md`](training/README.md): router training pipeline
+
+## Origin and credits
+
+Vedic Atlas was designed and built by **Praveen Krovvidi** ([@praveensivaram](https://github.com/praveensivaram)). The
+idea, the architecture and the code are his, from the first design through the orchestrator, memory, voice, music,
+vision, the phone app and the Raspberry Pi deployment.
+
+The project was first entered in **STG Make-a-thon 21** (October 2026). For the event, the shared repository was created
+under [ramgopalraju9/vedic-atlas](https://github.com/ramgopalraju9/vedic-atlas), which is why the earliest commits and
+pull requests in this history carry that name. After the event, development continued here. The full git history is
+kept as it was, so every contribution stays visible.
+
+Thanks to the teammates who supported the project during the make-a-thon:
+
+- **Pradeep Chirumamilla** ([@pradeepchirumamilla](https://github.com/pradeepchirumamilla))
+- **Manoj Routhu** ([@Manoj-Routhu](https://github.com/Manoj-Routhu))
+- **Ram Gopal Raju** ([@ramgopalraju9](https://github.com/ramgopalraju9)): set up the event repository and contributed
+  snippets to the voice session

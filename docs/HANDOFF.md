@@ -41,8 +41,7 @@ Needs `data/Qwen3-4B-Q4_K_M.gguf` (gitignored; path in `config/inference.yaml`) 
 
 ## Setting up on another laptop (what git does NOT carry)
 ```bash
-git clone https://github.com/ramgopalraju9/vedic-atlas.git && cd vedic-atlas
-git checkout feature/unified-orchestrator          # NOT main: main is the old routing design
+git clone https://github.com/praveensivaram/Vedic-atlas.git vedic-atlas && cd vedic-atlas
 python -m venv .venv && . .venv/Scripts/activate   # Linux/Pi: source .venv/bin/activate, and run scripts/setup_pi.sh instead of the pip line
 pip install -e .                                   # llama-cpp-python compiles from source where no wheel exists (10-30 min on a Pi)
 pip install pytest pytest-asyncio                  # not in pyproject
